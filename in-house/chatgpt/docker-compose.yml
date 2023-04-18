@@ -60,7 +60,7 @@ services:
     platform: linux/x86_64
     image: wongsaang/chatgpt-ui-web-server:latest
     environment:
-      - BACKEND_URL=http://backend-wsgi-server:8000
+      - BACKEND_URL=http://backend-wsgi-server:8000 # do not change
     ports:
       - '9009:80'
     depends_on:
