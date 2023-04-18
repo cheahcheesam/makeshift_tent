@@ -1,0 +1,93 @@
+# Adapted from https://github.com/WongSaang/chatgpt-ui
+
+version: '3.8'
+services:
+
+  client:
+    # chatgpt interface
+    platform: linux/x86_64
+    image: wongsaang/chatgpt-ui-client:latest
+    environment:
+      - SERVER_DOMAIN=http://backend-web-server # do not change
+      - DEFAULT_LOCALE=en # en = english, zh = chinese
+      - NUXT_PUBLIC_APP_NAME='ChatGPT UI' # The name of the application, feel free to modify accordingly
+#      - NUXT_PUBLIC_TYPEWRITER=true # Whether to enable the typewriter effect, default false
+#      - NUXT_PUBLIC_TYPEWRITER_DELAY=50 # The delay time of the typewriter effect, default 50ms
+    depends_on:
+      - backend-web-server
+    ports:
+      - '8008:80'
+    networks:
+      - chatgpt_ui_network
+    restart: always
+
+  backend-wsgi-server:
+    platform: linux/x86_64
+    image: wongsaang/chatgpt-ui-wsgi-server:latest
+    environment:
+      - APP_DOMAIN=chatgpt.i4wrd.com # corresponding domain name, please change accordingly
+      - SERVER_WORKERS=3 # The number of worker processes for handling requests.
+      - WORKER_TIMEOUT=180 # Workers silent for more than this many seconds are killed and restarted. default 180s
+      - DB_URL=postgres://chatgpt:Iotapps1!@chatgpt_db:5432/chatgpt # If this parameter is not set, the built-in Sqlite will be used by default. It should be noted that if you do not connect to an external database, the data will be lost after the container is destroyed.
+      - DJANGO_SUPERUSER_USERNAME=admin # default superuser name, can be modified accordingly
+      - DJANGO_SUPERUSER_PASSWORD=@chatgpt@ # default superuser password, can be modified accordingly
+      - DJANGO_SUPERUSER_EMAIL=admin@example.com # default superuser email
+      - ACCOUNT_EMAIL_VERIFICATION=${ACCOUNT_EMAIL_VERIFICATION:-none} # Determines the e-mail verification method during signup – choose one of "none", "optional", or "mandatory". Default is "optional". If you don't need to verify the email, you can set it to "none".
+      # If you want to use the email verification function, you need to configure the following parameters
+#      - EMAIL_HOST=SMTP server address
+#      - EMAIL_PORT=SMTP server port
+#      - EMAIL_HOST_USER=
+#      - EMAIL_HOST_PASSWORD=
+#      - EMAIL_USE_TLS=True
+#      - EMAIL_FROM=no-reply@example.com  #Default sender email address
+    ports:
+      - '8000:8000'
+    networks:
+      - chatgpt_ui_network
+    restart: always
+
+  backend-web-server:
+    # admin interface
+    # openai_api_key - if provided, all registered users will default to using it.
+    # open_api_key_setting - if set to True, users will have the option to supply their own api key in the Web UI. In the event of having  openai_api_key preconfigured, the user specified api key will take precedence over the preconfigured openai_api_key. If set to False, users  will not be able to supplu their own api key.
+    # open_registration - if set to True, the Web UI will accept user signups.
+    # open_web_search - whether to allow chatgpt to google search.
+    #
+    # Use case 1 (openai_api_key configured, open_api_key_setting: True) - Users are defaulted to use preconfigured api key, but able to supply  their own api key to be used as well.
+    # Use case 2 (openai_api_key configured, open_api_key_setting: False) - Users are defaulted to use preconfigured api key, users are not able  to supply their own api key.
+    # Use case 3 (openai_api_key not configured/dummy, open_api_key_setting: True) - Self service, users must supply their own api key to use  chatgpt.
+    # Use case 4 (openai_api_key not configured, open_api_key_setting: False) - Invalid use case, non-functional in any way.
+    platform: linux/x86_64
+    image: wongsaang/chatgpt-ui-web-server:latest
+    environment:
+      - BACKEND_URL=http://backend-wsgi-server:8000
+    ports:
+      - '9009:80'
+    depends_on:
+      - backend-wsgi-server
+    networks:
+      - chatgpt_ui_network
+    restart: always
+
+  chatgpt_db:
+    image: postgres
+    container_name: chatgpt_db
+    environment:
+      - POSTGRES_PASSWORD=Iotapps1!
+      - POSTGRES_DB=chatgpt
+      - POSTGRES_USER=chatgpt
+    restart: always
+    volumes:
+      - chatgpt_db_data:/var/lib/postgresql/data
+    expose:
+      - 5432
+    networks:
+      - chatgpt_ui_network
+
+networks:
+  chatgpt_ui_network:
+    driver: bridge
+
+volumes:
+  chatgpt_db_data:
+    name: chatgpt_db_data
